@@ -22,13 +22,14 @@ extern fn ecdh_key_derivation(
 		}
 
 		*olen = KEY_LEN as u64;
-		let res = KEY_HASH(input as *const u8, ilen, output as *mut u8);
+		let res = KDF(input as *const u8, ilen, output as *mut u8);
 		res as *mut libc::c_void
 	}
 }
 
 pub const KEY_LEN: usize = SHA512_DIGEST_LENGTH as usize;
-pub const KEY_HASH: (unsafe extern "C" fn(*const u8, u64, *mut u8) -> *mut u8) = SHA512;
+// Key Derivation Function
+pub const KDF: (unsafe extern "C" fn(*const u8, u64, *mut u8) -> *mut u8) = SHA512;
 
 pub struct ECDH;
 

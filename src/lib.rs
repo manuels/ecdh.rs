@@ -7,7 +7,7 @@ extern crate libc;
 mod bindings_ecdh;
 mod bindings_sha;
 
-mod group;
-mod key;
-mod ecdh;
+pub mod group;
+pub mod key;
+pub mod ecdh;
 mod tests;

@@ -42,6 +42,11 @@ impl Key {
 		}
 	}
 
+	// TODO: read private key
+	// TODO: write private key
+	// TODO: read public key
+	// TODO: write public key
+
 	pub fn as_ptr(&self) -> *const ec_key_st {
 		assert!(!self.ptr.is_null());
 		self.ptr

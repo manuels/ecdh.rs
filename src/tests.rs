@@ -21,7 +21,7 @@ fn ecdh_works() {
 	debug!("bob_symm_key: {:?}", bob_symm_key.unwrap().to_vec());
 	debug!("eve_symm_key: {:?}", eve_symm_key.unwrap().to_vec());
 
-	assert_eq!(alice_symm_key.unwrap().to_vec(), bob_symm_key.unwrap().to_vec());
+	assert!(alice_symm_key.unwrap().to_vec() == bob_symm_key.unwrap().to_vec());
 	assert!(alice_symm_key.unwrap().to_vec() != eve_symm_key.unwrap().to_vec());
-	assert!(bob_symm_key.unwrap().to_vec() != eve_symm_key.unwrap().to_vec());
+	assert!(bob_symm_key.unwrap().to_vec()   != eve_symm_key.unwrap().to_vec());
 }
