@@ -8,6 +8,8 @@ use bindings_ecdh::EC_KEY_get0_public_key;
 use bindings_ecdh::ec_point_st;
 
 use key::Key;
+use private_key::PrivateKey;
+use public_key::PublicKey;
 
 extern fn ecdh_key_derivation(
 			input: *const libc::c_void,
@@ -34,8 +36,8 @@ pub const KDF: (unsafe extern "C" fn(*const u8, u64, *mut u8) -> *mut u8) = SHA5
 pub struct ECDH;
 
 impl ECDH {
-	pub fn compute_key(alice_private_key: &Key,
-		               bob_public_key:    *const ec_point_st)
+	pub fn compute_key(alice_private_key: &PrivateKey,
+		               bob_public_key:    &PublicKey)
 		-> Result<[u8; KEY_LEN], ()>
 	{
 		/* NOTE to self:
@@ -56,7 +58,7 @@ impl ECDH {
 			let key_ptr = key.as_mut_ptr() as *mut libc::c_void;
 
 			ECDH_compute_key(key_ptr, expected_key_len,
-				bob_public_key, alice_private_key.as_mut_ptr(),
+				bob_public_key.as_point_ptr(), alice_private_key.as_mut_key_ptr(),
 				Some(ecdh_key_derivation))
 		} as u64;
 
