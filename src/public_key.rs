@@ -1,5 +1,5 @@
-use std::ffi::c_str_to_bytes;
 use std::ptr;
+use std::ffi::CStr;
 
 use bindings_ecdh::ec_key_st;
 use bindings_ecdh::ec_point_st;
@@ -83,7 +83,7 @@ impl PublicKey {
 			let ptr = EC_POINT_point2hex(group, point, form, ptr::null_mut()) as *const i8;
 			assert!(!ptr.is_null());
 
-			c_str_to_bytes(&ptr).to_vec().map_in_place(|i| i as i8)
+			CStr::from_ptr(ptr).to_bytes().to_vec().map_in_place(|i| i as i8)
 		}
 	}
 

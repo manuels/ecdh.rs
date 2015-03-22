@@ -1,9 +1,15 @@
-use std::ffi::c_str_to_bytes;
 use std::ptr;
+use std::io::Write;
+use libc;
+use std::ffi::CStr;
 
 use bindings_ecdh::ec_key_st;
+use bindings_ecdh::evp_pkey_st;
 use bindings_ecdh::ec_point_st;
 use bindings_ecdh::bignum_st;
+use bindings_ecdh::EVP_PKEY_new;
+use bindings_ecdh::EVP_PKEY_assign_EC_KEY;
+use bindings_ecdh::EVP_PKEY_set1_EC_KEY;
 use bindings_ecdh::EC_KEY_get0_public_key;
 use bindings_ecdh::EC_KEY_new;
 use bindings_ecdh::EC_KEY_free;
@@ -21,6 +27,14 @@ use bindings_ecdh::BN_hex2bn;
 use bindings_ecdh::BN_CTX_new;
 use bindings_ecdh::BN_CTX_free;
 use bindings_ecdh::BN_free;
+use bindings_ecdh::BIO_free;
+use bindings_ecdh::BIO_read;
+use bindings_ecdh::BIO_eof;
+use bindings_ecdh::BIO_set_close;
+use bindings_ecdh::BIO_new;
+use bindings_ecdh::BIO_s_mem;
+use bindings_ecdh::BIO_NOCLOSE;
+use bindings_ecdh::PEM_write_bio_PrivateKey;
 
 use public_key::PublicKey;
 use group::Group;
@@ -55,6 +69,52 @@ impl PrivateKey {
 		} else {
 			Err(())
 		}
+	}
+
+	pub fn to_pem<W>(&self, writer: &mut W) -> Result<(),()> where W: Write {
+		let evp = try!(self.to_evp_pkey());
+
+		let bio = unsafe {
+			let ptr = BIO_new(BIO_s_mem());
+			assert!(!ptr.is_null());
+			ptr
+		};
+
+		let res = unsafe {
+			PEM_write_bio_PrivateKey(bio, evp, ptr::null_mut(),
+			                         ptr::null_mut(), -1, ptr::null(), ptr::null_mut())
+		};
+
+		match res {
+			1 => unsafe {
+				let mut buf = vec![0u8; 4*1024];
+				let len = BIO_read(bio, buf.as_mut_ptr() as *mut libc::c_void,
+					buf.len() as libc::c_int);
+
+				if buf.len() > len as usize && len > 0 {
+					buf.truncate(len as usize);
+					writer.write(buf.as_slice()).unwrap();
+					writer.flush().unwrap();
+					Ok(())
+				} else {
+					Err(())
+				}
+			},
+			_ => Err(()),
+		}
+	}
+
+	fn to_evp_pkey(&self) -> Result<*mut evp_pkey_st,()> {
+		unsafe {
+			let evp = EVP_PKEY_new();
+			assert!(!evp.is_null());
+
+	  		if EVP_PKEY_set1_EC_KEY(evp, self.ptr) != 1 {
+	  			Err(())
+	  		} else {
+		  		Ok(evp)
+	  		}
+	  	}
 	}
 
 	pub fn from_vec(vec: &Vec<i8>) -> Result<PrivateKey,()> {
@@ -133,7 +193,7 @@ impl PrivateKey {
 			let ptr = BN_bn2hex(bn) as *const i8;
 			assert!(!ptr.is_null());
 
-			let vec = c_str_to_bytes(&ptr).to_vec();
+			let vec = CStr::from_ptr(ptr).to_bytes().to_vec();
 			//OPENSSL_free(vec); TODO
 			warn!("OPENSSL_free() missing!");
 

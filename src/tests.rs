@@ -3,6 +3,8 @@ use key::Key;
 use private_key::PrivateKey;
 use public_key::PublicKey;
 
+use std::fs::File;
+
 #[test]
 fn key_generation_works() {
 	let alice = PrivateKey::generate().unwrap();
@@ -15,8 +17,11 @@ fn key_io_works() {
 
 	assert!(PublicKey::from_vec(&public_key).unwrap().to_vec() == public_key);
 
-	assert!(PrivateKey::from_vec(&private_key).unwrap().to_vec() == private_key);
+	let key = PrivateKey::from_vec(&private_key).unwrap();
+	assert!(key.to_vec() == private_key);
 
+	let mut file = File::create("/tmp/foo.txt").unwrap();
+	key.to_pem(&mut file).unwrap();
 }
 
 #[test]
@@ -28,6 +33,11 @@ fn ecdh_works() {
 	let alice_symm_key = ecdh::ECDH::compute_key(&alice, &bob.get_public_key());
 	let bob_symm_key   = ecdh::ECDH::compute_key(&bob, &alice.get_public_key());
 	let eve_symm_key   = ecdh::ECDH::compute_key(&eve, &alice.get_public_key());
+
+	debug!("alice priv: {:?}", alice.to_vec());
+	debug!("alice pub: {:?}", alice.get_public_key().to_vec());
+	debug!("bob priv: {:?}", bob.to_vec());
+	debug!("bob pub: {:?}", bob.get_public_key().to_vec());
 
 	debug!("alice_symm_key: {:?}", alice_symm_key.unwrap().to_vec());
 	debug!("bob_symm_key: {:?}", bob_symm_key.unwrap().to_vec());

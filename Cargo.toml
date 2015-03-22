@@ -1,8 +1,11 @@
 [package]
 
 name = "ecdh"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Manuel Schölling <manuel.schoelling@gmx.de>"]
 description = "For OpenSSL's ECDH"
 homepage = "https://github.com/manuels/ecdh.rs"
 license = " GPL-2.0"
+
+[dependencies.log]
+version = "0.2.5"

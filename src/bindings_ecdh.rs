@@ -1,5 +1,6 @@
 extern crate libc;
 use std::mem;
+use std::ptr;
 
 type CRYPTO_dynlock_value = *mut i32;
 /*
@@ -5674,6 +5675,20 @@ extern "C" {
 	pub fn bn_sub_words(rp: *mut libc::c_ulong, ap: *const libc::c_ulong, bp: *const libc::c_ulong, num: libc::c_int) -> libc::c_ulong;
 }
 
+#[link(name="crypto")]
+extern "C" {
+	pub fn EVP_PKEY_new() -> *mut evp_pkey_st;
+}
+
+#[link(name="crypto")]
+extern "C" {
+	fn EVP_PKEY_assign(pkey: *mut evp_pkey_st, type_: libc::c_int, key: *mut ec_key_st) -> libc::c_int;
+	pub fn EVP_PKEY_set1_EC_KEY(pkey: *mut evp_pkey_st, key: *mut ec_key_st) -> libc::c_int;
+}
+pub unsafe fn EVP_PKEY_assign_EC_KEY(pkey: *mut evp_pkey_st, ec_key: *mut ec_key_st) -> libc::c_int {
+	EVP_PKEY_assign(pkey, EVP_PKEY_EC, ec_key)
+}
+
 
 /*
 BIGNUM * get_rfc2409_prime_768() [struct bignum_st *]
@@ -5939,6 +5954,8 @@ extern "C" {
 	pub fn i2d_ASN1_OBJECT(a: *mut asn1_object_st, pp: *mut *mut libc::c_uchar) -> libc::c_int;
 }
 
+pub const NID_X9_62_id_ecPublicKey: libc::c_int = 408;
+pub const EVP_PKEY_EC: libc::c_int = NID_X9_62_id_ecPublicKey;
 
 /*
 ASN1_OBJECT * c2i_ASN1_OBJECT() [struct asn1_object_st *]
@@ -8488,6 +8505,17 @@ extern "C" {
 	pub fn PEM_write_bio_ASN1_stream(out: *mut bio_st, val: *mut ASN1_VALUE_st, in_: *mut bio_st, flags: libc::c_int, hdr: *const libc::c_char, it: *const ASN1_ITEM_st) -> libc::c_int;
 }
 
+/*
+        int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, const EVP_CIPHER *enc,
+                                               unsigned char *kstr, int klen,
+                                               pem_password_cb *cb, void *u);
+*/
+#[link(name="crypto")]
+extern "C" {
+	pub fn PEM_write_bio_PrivateKey(out: *mut bio_st, pkey: *mut evp_pkey_st,
+		cipher: *mut evp_cipher_st, kstr: *mut libc::c_int, klen: libc::c_int,
+		cb: *const libc::c_void, u: *mut libc::c_void) -> libc::c_int;
+}
 
 /*
 int SMIME_write_ASN1()
@@ -15513,8 +15541,14 @@ pub const BIO_BIND_REUSEADDR: i32 = 2;
 /* BIO_reset ( b ) ( int ) BIO_ctrl ( b , BIO_CTRL_RESET , 0 , NULL ) # */
 
 /* BIO_eof ( b ) ( int ) BIO_ctrl ( b , BIO_CTRL_EOF , 0 , NULL ) # */
+pub unsafe fn BIO_eof(b: *mut bio_st) -> bool {
+    BIO_ctrl(b, BIO_CTRL_EOF, 0, ptr::null_mut()) == 1
+}
 
 /* BIO_set_close ( b , c ) ( int ) BIO_ctrl ( b , BIO_CTRL_SET_CLOSE , ( c ) , NULL ) # */
+pub unsafe fn BIO_set_close(b: *mut bio_st, c: libc::c_long) -> bool {
+    BIO_ctrl(b, BIO_CTRL_SET_CLOSE, c, ptr::null_mut()) == 1
+}
 
 /* BIO_get_close ( b ) ( int ) BIO_ctrl ( b , BIO_CTRL_GET_CLOSE , 0 , NULL ) # */
 
