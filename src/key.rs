@@ -7,6 +7,8 @@ use bindings_ecdh::EC_KEY_set_group;
 use bindings_ecdh::EC_KEY_get0_public_key;
 use bindings_ecdh::EC_KEY_check_key;
 use bindings_ecdh::EC_KEY_get0_group;
+use bindings_ecdh::EC_KEY_set_asn1_flag;
+use bindings_ecdh::OPENSSL_EC_NAMED_CURVE;
 
 use group::Group;
 
@@ -15,7 +17,9 @@ pub fn new_empty_key() -> *mut ec_key_st {
 
 	let ptr = unsafe {
 		let k = EC_KEY_new();
+
 		EC_KEY_set_group(k, grp.as_ptr());
+		EC_KEY_set_asn1_flag(k, OPENSSL_EC_NAMED_CURVE);
 
 		k
 	};
