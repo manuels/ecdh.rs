@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports, non_upper_case_globals, non_snake_case,
 	non_camel_case_types)]
-#![feature(libc, io, core, collections)]
+#![feature(libc, collections, convert)]
 
 #[macro_use]
 extern crate log;

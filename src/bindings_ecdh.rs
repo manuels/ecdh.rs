@@ -10011,7 +10011,7 @@ enum  {
 	POINT_CONVERSION_HYBRID =	0x00000006 (6)
 }
 */
-#[derive(Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 #[repr(u32)]
 pub enum point_conversion_form_t {
 	POINT_CONVERSION_COMPRESSED =	2 as u32,
@@ -10021,7 +10021,7 @@ pub enum point_conversion_form_t {
 
 impl point_conversion_form_t {
 	pub fn to_u32(&self) -> libc::c_uint {
-		*self as libc::c_uint
+		self.clone() as libc::c_uint
 	}
 
 	pub fn from_u32(v: libc::c_uint) -> point_conversion_form_t {
