@@ -40,7 +40,7 @@ impl PublicKey {
 		key
 	}
 
-	pub fn from_vec(vec: &Vec<i8>) -> Result<PublicKey,()> {
+	pub fn from_vec(vec: &Vec<u8>) -> Result<PublicKey,()> {
 		let ptr = key::new_empty_key();
 		let key = PublicKey {ptr: ptr};
 		let group = key.as_group_ptr();
@@ -48,7 +48,7 @@ impl PublicKey {
 		let mut v = vec.clone();
 		v.push(0);
 		let point = unsafe {
-			EC_POINT_hex2point(group, v.as_ptr(), ptr::null_mut(), ptr::null_mut())
+			EC_POINT_hex2point(group, v.as_ptr() as *mut i8, ptr::null_mut(), ptr::null_mut())
 		};
 		if point.is_null() {
 			warn!("PublicKey::from_vec(): point is NULL");
@@ -72,7 +72,7 @@ impl PublicKey {
 		}
 	}
 
-	pub fn to_vec(&self) -> Vec<i8> {
+	pub fn to_vec(&self) -> Vec<u8> {
 		assert!(self.is_valid());
 
 		let group = self.as_group_ptr();
@@ -83,7 +83,7 @@ impl PublicKey {
 			let ptr = EC_POINT_point2hex(group, point, form, ptr::null_mut()) as *const i8;
 			assert!(!ptr.is_null());
 
-			CStr::from_ptr(ptr).to_bytes().to_vec().map_in_place(|i| i as i8)
+			CStr::from_ptr(ptr).to_bytes().to_vec()
 		}
 	}
 

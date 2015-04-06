@@ -93,7 +93,7 @@ impl PrivateKey {
 
 				if buf.len() > len as usize && len > 0 {
 					buf.truncate(len as usize);
-					writer.write(buf.as_slice()).unwrap();
+					writer.write(&buf[..]).unwrap();
 					writer.flush().unwrap();
 					Ok(())
 				} else {
@@ -117,7 +117,7 @@ impl PrivateKey {
 	  	}
 	}
 
-	pub fn from_vec(vec: &Vec<i8>) -> Result<PrivateKey,()> {
+	pub fn from_vec(vec: &Vec<u8>) -> Result<PrivateKey,()> {
 		let ptr = key::new_empty_key();
 		let key = PrivateKey {ptr: ptr};
 		let mut bn: *mut bignum_st = ptr::null_mut();
@@ -125,7 +125,7 @@ impl PrivateKey {
 		let mut v = vec.clone();
 		v.push(0);
 		let res = unsafe {
-			BN_hex2bn(&mut bn, v.as_ptr())
+			BN_hex2bn(&mut bn, v.as_ptr() as *mut i8)
 		};
 		if res+1 != v.len() as i32 {
 			warn!("PrivateKey::from_vec(): BN_hex2bn() returned {}", res);
@@ -185,7 +185,7 @@ impl PrivateKey {
 		}
 	}
 
-	pub fn to_vec(&self) -> Vec<i8> {
+	pub fn to_vec(&self) -> Vec<u8> {
 		unsafe {
 			let bn = EC_KEY_get0_private_key(self.as_mut_key_ptr());
 			assert!(!bn.is_null());
@@ -197,7 +197,7 @@ impl PrivateKey {
 			//OPENSSL_free(vec); TODO
 			warn!("OPENSSL_free() missing!");
 
-			vec.map_in_place(|x|x as i8)
+			vec//.map_in_place(|x|x as i8)
 		}
 	}
 
