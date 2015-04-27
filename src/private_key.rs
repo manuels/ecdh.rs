@@ -8,6 +8,7 @@ use bindings_ecdh::evp_pkey_st;
 use bindings_ecdh::ec_point_st;
 use bindings_ecdh::bignum_st;
 use bindings_ecdh::EVP_PKEY_new;
+use bindings_ecdh::EVP_PKEY_free;
 use bindings_ecdh::EVP_PKEY_assign_EC_KEY;
 use bindings_ecdh::EVP_PKEY_set1_EC_KEY;
 use bindings_ecdh::EC_KEY_get0_public_key;
@@ -27,6 +28,7 @@ use bindings_ecdh::BN_hex2bn;
 use bindings_ecdh::BN_CTX_new;
 use bindings_ecdh::BN_CTX_free;
 use bindings_ecdh::BN_free;
+use bindings_ecdh::CRYPTO_free;
 use bindings_ecdh::BIO_free;
 use bindings_ecdh::BIO_read;
 use bindings_ecdh::BIO_eof;
@@ -45,6 +47,20 @@ pub struct PrivateKey {
 	ptr: *mut ec_key_st
 }
 
+struct BigNumber {
+	ptr: *mut bignum_st
+}
+
+impl Drop for BigNumber {
+	fn drop(&mut self) {
+		if self.ptr.is_null() {
+			unsafe {
+				BN_free(self.ptr)
+			}
+		}
+	}
+}
+
 impl key::Key for PrivateKey {
 	fn as_mut_key_ptr(&self) -> *mut ec_key_st {
 		assert!(!self.ptr.is_null());
@@ -52,10 +68,15 @@ impl key::Key for PrivateKey {
 	}
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//		assert!(key.is_valid());
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 impl PrivateKey {
 	pub fn generate() -> Result<PrivateKey,()> {
-		let ptr = key::new_empty_key();
-		let key = PrivateKey {ptr: ptr};
+		let key = PrivateKey {
+			ptr: key::new_empty_key()
+		};
 		
 		let res = unsafe {
 			EC_KEY_generate_key(key.as_mut_key_ptr())
@@ -74,6 +95,8 @@ impl PrivateKey {
 	pub fn to_pem<W>(&self, writer: &mut W) -> Result<(),()> where W: Write {
 		let evp = try!(self.to_evp_pkey());
 
+		// free evp, bio
+
 		let bio = unsafe {
 			let ptr = BIO_new(BIO_s_mem());
 			assert!(!ptr.is_null());
@@ -84,61 +107,72 @@ impl PrivateKey {
 			PEM_write_bio_PrivateKey(bio, evp, ptr::null_mut(),
 			                         ptr::null_mut(), -1, ptr::null(), ptr::null_mut())
 		};
+		unsafe {
+			EVP_PKEY_free(evp);
+		};
 
-		match res {
-			1 => unsafe {
-				let mut buf = vec![0u8; 4*1024];
+		if res == 1 {
+			let mut buf = vec![0u8; 4*1024];
+
+			let len = unsafe {
 				let len = BIO_read(bio, buf.as_mut_ptr() as *mut libc::c_void,
 					buf.len() as libc::c_int);
+				BIO_free(bio);
+				len
+			};
 
-				if buf.len() > len as usize && len > 0 {
-					buf.truncate(len as usize);
-					writer.write(&buf[..]).unwrap();
-					writer.flush().unwrap();
-					Ok(())
-				} else {
-					Err(())
-				}
-			},
-			_ => Err(()),
+			if buf.len() > len as usize && len > 0 {
+				buf.truncate(len as usize);
+				writer.write(&buf[..]).unwrap();
+				writer.flush().unwrap();
+
+				Ok(())
+			} else {
+				Err(())
+			}
+		}
+		else {
+			Err(())
 		}
 	}
 
+	/// You must free this pointer!
 	fn to_evp_pkey(&self) -> Result<*mut evp_pkey_st,()> {
 		unsafe {
 			let evp = EVP_PKEY_new();
 			assert!(!evp.is_null());
 
-	  		if EVP_PKEY_set1_EC_KEY(evp, self.ptr) != 1 {
-	  			Err(())
-	  		} else {
+	  		if EVP_PKEY_set1_EC_KEY(evp, self.ptr) == 1 {
 		  		Ok(evp)
+	  		} else {
+	  			Err(())
 	  		}
 	  	}
 	}
 
 	pub fn from_vec(vec: &Vec<u8>) -> Result<PrivateKey,()> {
-		let ptr = key::new_empty_key();
-		let key = PrivateKey {ptr: ptr};
-		let mut bn: *mut bignum_st = ptr::null_mut();
+		let key = PrivateKey {
+			ptr: key::new_empty_key()
+		};
+		let mut bn = BigNumber {
+			ptr: ptr::null_mut()
+		};
 
 		let mut v = vec.clone();
 		v.push(0);
+
 		let res = unsafe {
-			BN_hex2bn(&mut bn, v.as_ptr() as *mut i8)
+			BN_hex2bn(&mut bn.ptr, v.as_ptr() as *mut i8)
 		};
 		if res+1 != v.len() as i32 {
 			warn!("PrivateKey::from_vec(): BN_hex2bn() returned {}", res);
-			if !bn.is_null() {
-				unsafe { BN_free(bn) };
-			}
 			return Err(());
 		}
 
 		let res = unsafe {
-			EC_KEY_set_private_key(key.as_mut_key_ptr(), bn)
+			EC_KEY_set_private_key(key.as_mut_key_ptr(), bn.ptr)
 		};
-		unsafe { BN_free(bn) };
+
 		if res != 1 {
 			warn!("PrivateKey::from_vec(): EC_KEY_set_private_key() failed");
 			return Err(());
@@ -156,18 +190,15 @@ impl PrivateKey {
 
 	fn calculate_public_key(&self) -> Result<(),()> {
 		unsafe {
-			let group = self.as_group_ptr();
+			// do not free the result of EC_KEY_get0_private_key()!
 			let bn = EC_KEY_get0_private_key(self.as_mut_key_ptr());
-			let null = ptr::null();
-			let null_mut = ptr::null_mut();
+			let group = self.as_group_ptr();
 
-			let ctx = BN_CTX_new();
-			assert!(!ctx.is_null());
 			let point = EC_POINT_new(group);
 			assert!(!point.is_null());
 
-			let res = EC_POINT_mul(group, point, bn, null_mut, null, ctx);
-			BN_CTX_free(ctx);
+			let res = EC_POINT_mul(group, point, bn,
+				ptr::null_mut(), ptr::null(), ptr::null_mut());
 
 			if res != 1 {
 				warn!("PrivateKey::calculate_public_key(): EC_POINT_mul() failed");
@@ -177,6 +208,7 @@ impl PrivateKey {
 
 			let res = EC_KEY_set_public_key(self.as_mut_key_ptr(), point);
 			EC_POINT_free(point);
+
 			if res == 1 {
 				Ok(())
 			} else {
@@ -187,6 +219,7 @@ impl PrivateKey {
 
 	pub fn to_vec(&self) -> Vec<u8> {
 		unsafe {
+			// do not free the result of EC_KEY_get0_private_key()!
 			let bn = EC_KEY_get0_private_key(self.as_mut_key_ptr());
 			assert!(!bn.is_null());
 
@@ -194,15 +227,17 @@ impl PrivateKey {
 			assert!(!ptr.is_null());
 
 			let vec = CStr::from_ptr(ptr).to_bytes().to_vec();
-			//OPENSSL_free(vec); TODO
-			warn!("OPENSSL_free() missing!");
+			CRYPTO_free(ptr);
 
-			vec//.map_in_place(|x|x as i8)
+			vec
 		}
 	}
 
 	pub fn get_public_key(&self) -> PublicKey {
+		// Do not free this pointer
 		let ptr = self.as_point_ptr();
+
+		// Does not takes over ownership of 'ptr'
 		PublicKey::from_point_ptr(ptr)
 	}
 }

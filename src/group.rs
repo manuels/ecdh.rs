@@ -45,6 +45,7 @@ impl Drop for Group {
 	fn drop(&mut self) {
 		unsafe {
 			assert!(!self.as_ptr().is_null());
+			
 			EC_GROUP_free(self.as_mut_ptr());
 		}
 	}

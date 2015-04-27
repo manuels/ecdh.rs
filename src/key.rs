@@ -1,3 +1,5 @@
+use std::ptr;
+
 use bindings_ecdh::ec_point_st;
 use bindings_ecdh::ec_key_st;
 use bindings_ecdh::ec_group_st;
@@ -15,18 +17,19 @@ use group::Group;
 pub fn new_empty_key() -> *mut ec_key_st {
 	let grp = Group::new();
 
-	let ptr = unsafe {
-		let k = EC_KEY_new();
+	unsafe {
+		let ptr = EC_KEY_new();
+		assert!(!ptr.is_null());
 
-		EC_KEY_set_group(k, grp.as_ptr());
-		EC_KEY_set_asn1_flag(k, OPENSSL_EC_NAMED_CURVE);
+		// EC_KEY_set_group() uses a copy of the group,
+		// so we can free it
+		EC_KEY_set_group(ptr, grp.as_ptr());
+		drop(grp);
 
-		k
-	};
-	drop(grp);
+		EC_KEY_set_asn1_flag(ptr, OPENSSL_EC_NAMED_CURVE);
 
-	assert!(!ptr.is_null());
-	ptr
+		ptr
+	}
 }
 
 pub trait Key {
@@ -38,14 +41,16 @@ pub trait Key {
 
 	fn as_mut_key_ptr(&self) -> *mut ec_key_st;
 
+	/// Do not free this pointer!
 	fn as_point_ptr(&self) -> *const ec_point_st {
 		let ptr = unsafe {
 			EC_KEY_get0_public_key(self.as_key_ptr())
-		}; // to not free ptr!
+		};
 		assert!(!ptr.is_null());
 		ptr
 	}
 
+	/// Do not free this pointer!
 	fn as_group_ptr(&self) -> *const ec_group_st {
 		let group = unsafe {
 			EC_KEY_get0_group(self.as_key_ptr())

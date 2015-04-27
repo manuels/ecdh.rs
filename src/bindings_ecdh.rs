@@ -2424,7 +2424,7 @@ void CRYPTO_free()
 */
 #[link(name="crypto")]
 extern "C" {
-	pub fn CRYPTO_free(ptr: *mut libc::c_void);
+	pub fn CRYPTO_free(ptr: *const i8);
 }
 
 
@@ -5678,6 +5678,11 @@ extern "C" {
 #[link(name="crypto")]
 extern "C" {
 	pub fn EVP_PKEY_new() -> *mut evp_pkey_st;
+}
+
+#[link(name="crypto")]
+extern "C" {
+	pub fn EVP_PKEY_free(ptr: *mut evp_pkey_st);
 }
 
 #[link(name="crypto")]

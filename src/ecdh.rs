@@ -11,11 +11,15 @@ use key::Key;
 use private_key::PrivateKey;
 use public_key::PublicKey;
 
+pub const KEY_LEN: usize = SHA512_DIGEST_LENGTH as usize;
+// Key Derivation Function
+pub const KDF: (unsafe extern "C" fn(*const u8, u64, *mut u8) -> *mut u8) = SHA512;
+
 extern fn ecdh_key_derivation(
-			input: *const libc::c_void,
-			ilen: libc::c_ulong,
+			input:  *const libc::c_void,
+			ilen:   libc::c_ulong,
 			output: *mut libc::c_void,
-			olen: *mut libc::c_ulong)
+			olen:   *mut libc::c_ulong)
 	-> *mut libc::c_void
 {
 	unsafe {
@@ -29,10 +33,6 @@ extern fn ecdh_key_derivation(
 	}
 }
 
-pub const KEY_LEN: usize = SHA512_DIGEST_LENGTH as usize;
-// Key Derivation Function
-pub const KDF: (unsafe extern "C" fn(*const u8, u64, *mut u8) -> *mut u8) = SHA512;
-
 pub struct ECDH;
 
 impl ECDH {
@@ -41,7 +41,7 @@ impl ECDH {
 		-> Result<[u8; KEY_LEN], ()>
 	{
 		/* NOTE to self:
-		 * This function does NOT ensure FORWARD SECURITY!
+		 * This function does NOT ensure FORWARD SECRECY!
 		 *
 		 * But if we to use this function for temporary data only
 		 * (ie. our current IP and port, which is kind of obvious anyway)
@@ -58,11 +58,12 @@ impl ECDH {
 			let key_ptr = key.as_mut_ptr() as *mut libc::c_void;
 
 			ECDH_compute_key(key_ptr, expected_key_len,
-				bob_public_key.as_point_ptr(), alice_private_key.as_mut_key_ptr(),
+				bob_public_key.as_point_ptr(),
+				alice_private_key.as_mut_key_ptr(),
 				Some(ecdh_key_derivation))
 		} as u64;
 
-		if actual_key_len== expected_key_len {
+		if actual_key_len == expected_key_len {
 			Ok(key)
 		} else {
 			Err(())
