@@ -11,7 +11,12 @@ mod bindings_sha;
 mod key;
 
 pub mod group;
+pub mod ecdh;
 pub mod private_key;
 pub mod public_key;
-pub mod ecdh;
+pub mod big_number;
 mod tests;
+
+pub use ecdh::ECDH;
+pub use private_key::PrivateKey;
+pub use public_key::PublicKey;

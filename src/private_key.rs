@@ -1,5 +1,6 @@
 use std::ptr;
-use std::io::Write;
+use std::io;
+use std::io::{Write,ErrorKind};
 use libc;
 use std::ffi::CStr;
 
@@ -35,6 +36,7 @@ use bindings_ecdh::BIO_eof;
 use bindings_ecdh::BIO_set_close;
 use bindings_ecdh::BIO_new;
 use bindings_ecdh::BIO_s_mem;
+
 use bindings_ecdh::BIO_NOCLOSE;
 use bindings_ecdh::PEM_write_bio_PrivateKey;
 
@@ -42,23 +44,11 @@ use public_key::PublicKey;
 use group::Group;
 use key;
 use key::Key;
+use big_number::BigNumber;
+use std::mem;
 
 pub struct PrivateKey {
 	ptr: *mut ec_key_st
-}
-
-struct BigNumber {
-	ptr: *mut bignum_st
-}
-
-impl Drop for BigNumber {
-	fn drop(&mut self) {
-		if self.ptr.is_null() {
-			unsafe {
-				BN_free(self.ptr)
-			}
-		}
-	}
 }
 
 impl key::Key for PrivateKey {
@@ -92,8 +82,9 @@ impl PrivateKey {
 		}
 	}
 
-	pub fn to_pem<W>(&self, writer: &mut W) -> Result<(),()> where W: Write {
-		let evp = try!(self.to_evp_pkey());
+	pub fn to_pem<W>(&self, writer: &mut W) -> io::Result<usize> where W: Write {
+		let evp = try!(self.to_evp_pkey()
+			.map_err(|_| io::Error::new(ErrorKind::Other, "to_evp_pkey() failed")));
 
 		// free evp, bio
 
@@ -123,16 +114,17 @@ impl PrivateKey {
 
 			if buf.len() > len as usize && len > 0 {
 				buf.truncate(len as usize);
-				writer.write(&buf[..]).unwrap();
-				writer.flush().unwrap();
+				let len = try!(writer.write(&buf[..]));
+				try!(writer.flush());
 
-				Ok(())
+				Ok(len)
 			} else {
-				Err(())
+				Err(io::Error::new(ErrorKind::Other, "BIO_read() failed"))
 			}
 		}
 		else {
-			Err(())
+			unsafe { BIO_free(bio) };
+			Err(io::Error::new(ErrorKind::Other, "PEM_write_bio_PrivateKey() failed"))
 		}
 	}
 
@@ -154,23 +146,10 @@ impl PrivateKey {
 		let key = PrivateKey {
 			ptr: key::new_empty_key()
 		};
-		let mut bn = BigNumber {
-			ptr: ptr::null_mut()
-		};
-
-		let mut v = vec.clone();
-		v.push(0);
+		let bn = try!(BigNumber::from_vec(vec));
 
 		let res = unsafe {
-			BN_hex2bn(&mut bn.ptr, v.as_ptr() as *mut i8)
-		};
-		if res+1 != v.len() as i32 {
-			warn!("PrivateKey::from_vec(): BN_hex2bn() returned {}", res);
-			return Err(());
-		}
-
-		let res = unsafe {
-			EC_KEY_set_private_key(key.as_mut_key_ptr(), bn.ptr)
+			EC_KEY_set_private_key(key.as_mut_key_ptr(), bn.as_ptr())
 		};
 
 		if res != 1 {
@@ -220,14 +199,11 @@ impl PrivateKey {
 	pub fn to_vec(&self) -> Vec<u8> {
 		unsafe {
 			// do not free the result of EC_KEY_get0_private_key()!
-			let bn = EC_KEY_get0_private_key(self.as_mut_key_ptr());
-			assert!(!bn.is_null());
+			let ptr = EC_KEY_get0_private_key(self.as_mut_key_ptr());
+			let bn = BigNumber::from_ptr(ptr as *mut _);
 
-			let ptr = BN_bn2hex(bn) as *const i8;
-			assert!(!ptr.is_null());
-
-			let vec = CStr::from_ptr(ptr).to_bytes().to_vec();
-			CRYPTO_free(ptr);
+			let vec = bn.to_vec();
+			mem::forget(bn);
 
 			vec
 		}

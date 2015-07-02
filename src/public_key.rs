@@ -5,14 +5,16 @@ use bindings_ecdh::evp_pkey_st;
 use bindings_ecdh::ec_key_st;
 use bindings_ecdh::ec_point_st;
 use bindings_ecdh::EC_KEY_set_public_key;
-use bindings_ecdh::EC_POINT_point2hex;
+use bindings_ecdh::EC_POINT_point2bn;
 use bindings_ecdh::EC_POINT_hex2point;
+use bindings_ecdh::EC_POINT_bn2point;
 use bindings_ecdh::EC_POINT_free;
 use bindings_ecdh::point_conversion_form_t::POINT_CONVERSION_COMPRESSED;
 use bindings_ecdh::EVP_PKEY_new;
 use bindings_ecdh::EVP_PKEY_free;
 use bindings_ecdh::EVP_PKEY_set1_EC_KEY;
 
+use big_number::{BigNumber,BigNumberContext};
 use group::Group;
 use key;
 use key::Key;
@@ -55,12 +57,10 @@ impl PublicKey {
 		};
 		let group = key.as_group_ptr();
 
-		let mut v = vec.clone();
-		v.push(0);
+		let bn = try!(BigNumber::from_vec(vec));
 
 		let point = unsafe {
-			EC_POINT_hex2point(group, v.as_ptr() as *mut i8,
-				ptr::null_mut(), ptr::null_mut())
+			EC_POINT_bn2point(group, bn.as_ptr(), ptr::null_mut(), ptr::null_mut())
 		};
 		if point.is_null() {
 			warn!("PublicKey::from_vec(): point is NULL (len={}).", vec.len());
@@ -85,19 +85,25 @@ impl PublicKey {
 		}
 	}
 
-	pub fn to_vec(&self) -> Vec<u8> {
-		assert!(self.is_valid());
-
+	fn to_big_number(&self) -> BigNumber {
 		let group = self.as_group_ptr();
 		let point = self.as_point_ptr();
 
-		unsafe {
-			let form = POINT_CONVERSION_COMPRESSED.to_u32();
-			let ptr = EC_POINT_point2hex(group, point, form, ptr::null_mut());
-			assert!(!ptr.is_null());
+		let bn = BigNumber::new();
+		let bn_ctx = BigNumberContext::new();
+		let form = POINT_CONVERSION_COMPRESSED.to_u32();
+		let res = unsafe {
+			EC_POINT_point2bn(group, point, form, bn.as_mut_ptr(), bn_ctx.as_mut_ptr())
+		};
+		assert_eq!(res, bn.as_mut_ptr());
 
-			CStr::from_ptr(ptr as *const i8).to_bytes().to_vec()
-		}
+		bn
+	}
+
+	pub fn to_vec(&self) -> Vec<u8> {
+		assert!(self.is_valid());
+
+		self.to_big_number().to_vec()
 	}
 
 	/// WARN: YOU must free the *mut evp_pkey_st!

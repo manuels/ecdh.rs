@@ -1,7 +1,6 @@
 [package]
-
 name = "ecdh"
-version = "0.0.9"
+version = "0.0.10"
 authors = ["Manuel Schölling <manuel.schoelling@gmx.de>"]
 description = "For OpenSSL's ECDH"
 homepage = "https://github.com/manuels/ecdh.rs"

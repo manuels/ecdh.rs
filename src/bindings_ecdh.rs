@@ -15887,6 +15887,9 @@ pub const BN_prime_checks: i32 = 0;
 /* BN_prime_checks_for_size ( b ) ( ( b ) >= 1300 ? 2 : ( b ) >= 850 ? 3 : ( b ) >= 650 ? 4 : ( b ) >= 550 ? 5 : ( b ) >= 450 ? 6 : ( b ) >= 400 ? 7 : ( b ) >= 350 ? 8 : ( b ) >= 300 ? 9 : ( b ) >= 250 ? 12 : ( b ) >= 200 ? 15 : ( b ) >= 150 ? 18 : /* b >= 100 */ 27 ) # */
 
 /* BN_num_bytes ( a ) ( ( BN_num_bits ( a ) + 7 ) / 8 ) /* Note that BN_abs_is_word didn't work reliably for w == 0 until 0.9.8 */ */
+pub unsafe fn BN_num_bytes(a: *mut bignum_st) -> libc::c_int {
+	(BN_num_bits(a) + 7) / 8
+}
 
 /* BN_abs_is_word ( a , w ) ( ( ( ( a ) -> top == 1 ) && ( ( a ) -> d [ 0 ] == ( BN_ULONG ) ( w ) ) ) || ( ( ( w ) == 0 ) && ( ( a ) -> top == 0 ) ) ) # */
 
