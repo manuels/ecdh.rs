@@ -24,6 +24,7 @@ pub struct PublicKey {
 }
 
 unsafe impl Send for PublicKey {}
+unsafe impl Sync for PublicKey {}
 
 impl key::Key for PublicKey {
 	fn as_mut_key_ptr(&self) -> *mut ec_key_st {

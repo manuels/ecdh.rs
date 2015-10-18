@@ -51,6 +51,9 @@ pub struct PrivateKey {
 	ptr: *mut ec_key_st
 }
 
+unsafe impl Send for PrivateKey {}
+unsafe impl Sync for PrivateKey {}
+
 impl key::Key for PrivateKey {
 	fn as_mut_key_ptr(&self) -> *mut ec_key_st {
 		assert!(!self.ptr.is_null());
